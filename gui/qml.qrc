@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/qml">
+        <file>main.qml</file>
+        <file>Home.qml</file>
+        <file>Page1.qml</file>
+        <file>Page2.qml</file>
+        <file>qtquickcontrols2.conf</file>
+        <file>LabelSpinBox.qml</file>
+        <file>LabelTextField.qml</file>
+    </qresource>
+</RCC>
