@@ -17,5 +17,36 @@
 #
 #############################################################################
 
-add_executable(${PROJECT_NAME} "main.cpp")
-target_link_libraries(${PROJECT_NAME} Qt5::Core Qt5::Quick gui)
+if (WIN32)
+    include_directories("${PROJECT_SOURCE_DIR}/libusb-1.0.22/include")
+    set (LIB_USB libusb-1.0)
+    # Copy DLL files to output directory
+    if (CMAKE_CL_64)
+        link_directories("${PROJECT_SOURCE_DIR}/libusb-1.0.22/MS64/dll")
+    else ()
+        link_directories("${PROJECT_SOURCE_DIR}/libusb-1.0.22/MS32/dll")
+    endif ()
+else ()
+    set (LIB_USB usb-1.0)
+endif ()
+
+add_executable(${PROJECT_NAME}
+    main.cpp
+    bigeyelinker.cpp)
+
+target_link_libraries(${PROJECT_NAME} Qt5::Core Qt5::Quick ${LIB_USB} gui)
+
+if (WIN32)
+    # Copy DLL files to output directory
+    if (CMAKE_CL_64)
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PROJECT_SOURCE_DIR}/libusb-1.0.22/MS64/dll/libusb-1.0.dll"
+            "${PROJECT_BINARY_DIR}/src/libusb-1.0.dll")
+    else ()
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PROJECT_SOURCE_DIR}/libusb-1.0.22/MS32/dll/libusb-1.0.dll"
+            "${PROJECT_BINARY_DIR}/src/libusb-1.0.dll")
+    endif ()
+endif ()
