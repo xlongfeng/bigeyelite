@@ -57,11 +57,14 @@ public:
     void enqueueReceiveBytes(const QByteArray &bytes);
     QByteArray dequeueReceiveBytes();
 
-    void tramsmitBytes(const QByteArray &bytes);
+    void tramsmitBytes(const QByteArray &bytes, bool defer = true);
+    void tramsmitQueue();
 
     bool discardPrecedingData();
 
 signals:
+    void deviceAttached();
+    void deviceDetached();
     void dataArrived(const QByteArray &bytes);
 
 protected:
@@ -173,7 +176,11 @@ private:
         static const int DefaultBufferSize = 16384;
     };
 
+    QMutex transmitMutex;
+    int transmitBlockCount;
+
     QQueue<QByteArray> receiveQueue;
+    QQueue<QByteArray> transmitQueue;
 
     USBTransferBlock *pingReceiveBlock;
     USBTransferBlock *pongReceiveBlock;

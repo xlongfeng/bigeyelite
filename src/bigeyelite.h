@@ -20,15 +20,20 @@
 #ifndef BIGEYELITE_H
 #define BIGEYELITE_H
 
-#include <QObject>
+#include <QList>
+#include <QQueue>
+#include <QPair>
 
+#include "bigeye.h"
+
+class QTimer;
 class BigeyeLinker;
 
-class BigeyeLite : public QObject
+class BigeyeLite : public Bigeye
 {
     Q_OBJECT
 
-    Q_PROPERTY(LinkStatus linkStatus READ linkStatus WRITE setLinkStatus NOTIFY linkStatusChanged)
+    Q_PROPERTY(LinkStatus linkStatus READ linkStatus MEMBER m_linkStatus WRITE setLinkStatus NOTIFY linkStatusChanged)
 
 public:
     enum LinkStatus {
@@ -38,6 +43,8 @@ public:
 
     Q_ENUM(LinkStatus)
 
+    ~BigeyeLite();
+
     static BigeyeLite *instance();
 
     Q_INVOKABLE void start();
@@ -45,16 +52,31 @@ public:
 
     LinkStatus linkStatus()
     {
-        return Disconnected;
+        return m_linkStatus;
     }
 
     void setLinkStatus(LinkStatus status)
     {
-
+        m_linkStatus = status;
+        emit linkStatusChanged();
     }
 
 signals:
     void linkStatusChanged();
+
+private slots:
+    void onDeviceAttached();
+    void onDeviceDetached();
+    void onTransmitSequence();
+    void onDataArrived(const QByteArray &bytes);
+
+private:
+    void powerButtonPress();
+    void knobLeftRotate();
+    void knobRightRotate();
+    void enterButtonPress();
+    void runningStateQuery();
+    void repeaterFileWrite(const QString &filename, const QByteArray &content, int delay = 50);
 
 private:
     explicit BigeyeLite(QObject *parent = nullptr);
@@ -63,6 +85,11 @@ private:
 private:
     static BigeyeLite *self;
     BigeyeLinker *linker;
+    LinkStatus m_linkStatus;
+
+    static QList<QPair<QString, QString>> initSequence;
+    QTimer *sequenceBlockTimer;
+    QQueue<QPair<QByteArray, int>> sequenceBlock;
 };
 
 #endif // BIGEYELITE_H
