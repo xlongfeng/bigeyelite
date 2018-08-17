@@ -23,15 +23,16 @@ QList<BigeyeLinker::USBTransferBlock *> BigeyeLinker::USBTransferBlock::transfer
 
 BigeyeLinker::BigeyeLinker(QObject *parent) : QThread(parent),
     interrupt(false),
+    deviceStatus(LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
     discarding(true)
 {
-    pingReceiveBlock = USBTransferBlock::create(this);
-    pongReceiveBlock = USBTransferBlock::create(this);
-
     int rc = libusb_init(&ctx);
     if (LIBUSB_SUCCESS != rc) {
         qDebug() << "libusb_init" << libusb_error_name(rc);
     }
+
+    pingReceiveBlock = USBTransferBlock::create(this);
+    pongReceiveBlock = USBTransferBlock::create(this);
 }
 
 BigeyeLinker::~BigeyeLinker()
@@ -65,7 +66,7 @@ void BigeyeLinker::tramsmitBytes(const QByteArray &bytes)
 {
     // qDebug() << "tramsmitBytes" << bytes.size();
     USBTransferBlock *transmitBlock = USBTransferBlock::create(this, bytes);
-    transmitBlock->fillBulk(device, 1, transmitTransferCallback);
+    transmitBlock->fillBulk(deviceHandle, 1, transmitTransferCallback);
     transmitBlock->submit();
 }
 
@@ -83,49 +84,82 @@ bool BigeyeLinker::discardPrecedingData()
 
 void BigeyeLinker::run()
 {
-    qDebug() << "BigeyeLinker" << "start";
-
-    int rc = libusb_hotplug_register_callback(
-                ctx, (libusb_hotplug_event)(LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED |
-                LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
-                (libusb_hotplug_flag)LIBUSB_HOTPLUG_ENUMERATE,
-                0x2009, 0x0805, LIBUSB_HOTPLUG_MATCH_ANY,
-                hotplugCallback, this, &hotplug);
-    if (LIBUSB_SUCCESS != rc) {
-        qDebug() << "libusb_init" << libusb_error_name(rc);
-    }
+    hasHotplug = libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG) != 0;
+    qDebug() << "BigeyeLinker" << "hotplug"
+             << (hasHotplug ? "support" : "unsupport");
 
     clearSafeExitRequested();
+
+    if (hasHotplug) {
+        int rc = libusb_hotplug_register_callback(
+                    ctx, (libusb_hotplug_event)(LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED |
+                    LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
+                    (libusb_hotplug_flag)LIBUSB_HOTPLUG_ENUMERATE,
+                    0x2009, 0x0805, LIBUSB_HOTPLUG_MATCH_ANY,
+                    hotplugCallback, this, &hotplug);
+        if (LIBUSB_SUCCESS != rc) {
+            qDebug() << "libusb_init" << libusb_error_name(rc);
+        }
+    } else {
+
+    }
 
     forever {
         if (isSafeExitRequested())
             break;
-        // qDebug() << "BigeyeLinker" << "handle";
-        libusb_handle_events_completed(Q_NULLPTR, Q_NULLPTR);
+        if (!hasHotplug && deviceStatus == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT) {
+            findDevice();
+            msleep(1500);
+        } else {
+            // qDebug() << "BigeyeLinker" << "handle";
+            libusb_handle_events_completed(nullptr, nullptr);
+        }
     }
 
-    if (device) {
+    if (deviceHandle) {
         stopReceive();
-        libusb_close(device);
-        device = Q_NULLPTR;
+        libusb_close(deviceHandle);
+        deviceHandle = nullptr;
     }
 
     qDebug() << "BigeyeLinker" << "end";
 }
 
+void BigeyeLinker::findDevice()
+{
+    libusb_device **list;
+    int count = libusb_get_device_list(ctx, &list);
+    if (count > 0) {
+        for (int i = 0; i < count; i++) {
+            libusb_device *dev = list[i];
+            libusb_device_descriptor deviceDescriptor;
+            int rc = libusb_get_device_descriptor(dev, &deviceDescriptor);
+            if (rc == LIBUSB_SUCCESS) {
+                if (deviceDescriptor.idVendor == 0x2009 && deviceDescriptor.idProduct == 0x0805) {
+                    hotplugCallback(ctx, dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, this);
+                    break;
+                }
+            } else {
+                qDebug() << "libusb_get_device_descriptor failed: " << rc << i;
+            }
+        }
+        libusb_free_device_list(list, 1);
+    }
+}
+
 void BigeyeLinker::startReceive()
 {
-    if (libusb_kernel_driver_active(device, 0) == 1)
-        libusb_detach_kernel_driver(device, 0);
-    libusb_claim_interface(device, 0);
+    if (libusb_kernel_driver_active(deviceHandle, 0) == 1)
+        libusb_detach_kernel_driver(deviceHandle, 0);
+    libusb_claim_interface(deviceHandle, 0);
 
     discarding = true;
     discardTime.restart();
 
-    pingReceiveBlock->fillBulk(device, 129, receiveTransferCallback);
+    pingReceiveBlock->fillBulk(deviceHandle, 129, receiveTransferCallback);
     pingReceiveBlock->submit();
 
-    pongReceiveBlock->fillBulk(device, 129, receiveTransferCallback);
+    pongReceiveBlock->fillBulk(deviceHandle, 129, receiveTransferCallback);
     pongReceiveBlock->submit();
 }
 
@@ -133,12 +167,13 @@ void BigeyeLinker::stopReceive()
 {
     pongReceiveBlock->cancel();
     pingReceiveBlock->cancel();
-    libusb_release_interface(device, 0);
+    libusb_release_interface(deviceHandle, 0);
 }
 
 void BigeyeLinker::transmitTransferCallback(libusb_transfer *transfer)
 {
     USBTransferBlock *usbTransferBlock = (USBTransferBlock *)transfer->user_data;
+    BigeyeLinker *self = (BigeyeLinker *)usbTransferBlock->parent;
 
     switch (transfer->status) {
     case LIBUSB_TRANSFER_COMPLETED:
@@ -150,9 +185,11 @@ void BigeyeLinker::transmitTransferCallback(libusb_transfer *transfer)
     case LIBUSB_TRANSFER_OVERFLOW:
         // break;
     case LIBUSB_TRANSFER_CANCELLED:
-        // break;
+        qDebug() << "Transmit transfer callback" << transfer->status;
+        break;
     case LIBUSB_TRANSFER_NO_DEVICE:
-        // break;
+        hotplugCallback(self->ctx, nullptr, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT, self);
+        break;
     default:
         qDebug() << "Transmit transfer callback" << transfer->status;
         break;
@@ -177,9 +214,11 @@ void BigeyeLinker::receiveTransferCallback(libusb_transfer *transfer)
     case LIBUSB_TRANSFER_OVERFLOW:
         // break;
     case LIBUSB_TRANSFER_CANCELLED:
-        // break;
+        qDebug() << "Receive transfer callback" << transfer->status;
+        break;
     case LIBUSB_TRANSFER_NO_DEVICE:
-        // break;
+        hotplugCallback(self->ctx, nullptr, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT, self);
+        break;
     default:
         qDebug() << "Receive transfer callback" << transfer->status;
         break;
@@ -195,18 +234,20 @@ int BigeyeLinker::hotplugCallback(libusb_context *ctx, libusb_device *dev,
 
     if (LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED == event) {
         msleep(1500);
-        rc = libusb_open(dev, &self->device);
+        rc = libusb_open(dev, &self->deviceHandle);
         if (LIBUSB_SUCCESS != rc) {
             qDebug() << "libusb_open" << libusb_error_name(rc);
         } else {
+            self->deviceStatus = LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED;
             dumpUsbInformation(dev);
             self->startReceive();
         }
     } else if (LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT == event) {
-        if (self->device) {
+        self->deviceStatus = LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT;
+        if (self->deviceHandle) {
             self->stopReceive();
-            libusb_close(self->device);
-            self->device = Q_NULLPTR;
+            libusb_close(self->deviceHandle);
+            self->deviceHandle = nullptr;
         }
         qDebug() << "libusb_close";
     } else {

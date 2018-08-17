@@ -68,6 +68,7 @@ protected:
     virtual void run();
 
 private:
+    void findDevice();
     void startReceive();
     void stopReceive();
     static void transmitTransferCallback(libusb_transfer *transfer);
@@ -178,7 +179,9 @@ private:
     USBTransferBlock *pongReceiveBlock;
 
     libusb_context *ctx;
-    libusb_device_handle *device;
+    libusb_device_handle *deviceHandle;
+    bool hasHotplug;
+    libusb_hotplug_event deviceStatus;
     libusb_hotplug_callback_handle hotplug;
 
     QTime discardTime;

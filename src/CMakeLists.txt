@@ -32,7 +32,9 @@ endif ()
 
 add_executable(${PROJECT_NAME}
     main.cpp
-    bigeyelinker.cpp)
+    bigeyelinker.cpp
+    bigeyelite.cpp
+    logmodel.cpp)
 
 target_link_libraries(${PROJECT_NAME} Qt5::Core Qt5::Quick ${LIB_USB} gui)
 

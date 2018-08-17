@@ -20,6 +20,18 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 
+#include "bigeyelite.h"
+#include "logmodel.h"
+
+static QObject *bigeyelite_singletontype_provider(QQmlEngine *engine, QJSEngine *scriptEngine)
+{
+    Q_UNUSED(engine)
+    Q_UNUSED(scriptEngine)
+
+    BigeyeLite *singleton = BigeyeLite::instance();
+    return singleton;
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
@@ -27,6 +39,9 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
 
     Q_INIT_RESOURCE(qml);
+
+    qmlRegisterSingletonType<BigeyeLite>("Backend", 1, 0, "BigeyeLite", bigeyelite_singletontype_provider);
+    qmlRegisterType<LogModel>("Backend", 1, 0, "LogModel");
 
     QQmlApplicationEngine engine;
     engine.load(QUrl(QStringLiteral("qrc:/qml/main.qml")));

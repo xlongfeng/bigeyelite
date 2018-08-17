@@ -21,6 +21,8 @@ import QtQuick 2.10
 import QtQuick.Layouts 1.3
 import QtQuick.Controls 2.3
 
+import Backend 1.0
+
 Page {
     title: qsTr("Home")
 
@@ -136,6 +138,7 @@ Page {
             Button {
                 text: qsTr("Start")
                 width: parent.width
+                onPressed: BigeyeLite.start()
             }
         }
     }
@@ -163,7 +166,18 @@ Page {
                 text: qsTr("Powerup Counter")
             }
 
+            Rectangle {
+                color: "gray"
+                Layout.preferredHeight: 1
+                Layout.fillWidth: true
+            }
+
             ListView {
+                model: LogModel { }
+                delegate: Text {
+                    text: display
+                }
+
                 Layout.fillWidth: true
                 Layout.fillHeight: true
             }
@@ -171,7 +185,7 @@ Page {
     }
 
     BusyIndicator {
-        running: true
+        running: BigeyeLite.linkStatus == BigeyeLite.Disconnected
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.margins: 32
