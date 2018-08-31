@@ -52,14 +52,16 @@ QList<QPair<QString, QString>> BigeyeLite::initSequence = {
 };
 
 BigeyeLite::BigeyeLite(QObject *parent) :
-    Bigeye(parent),
-    m_linkStatus(Disconnected)
+    Bigeye(parent)
 {
     connect(qApp, SIGNAL(aboutToQuit()), this, SLOT(deleteLater()));
     linker = new BigeyeLinker(this);
     connect(linker, SIGNAL(deviceAttached()), this, SLOT(onDeviceAttached()));
     connect(linker, SIGNAL(deviceDetached()), this, SLOT(onDeviceDetached()));
     connect(linker, SIGNAL(dataArrived(QByteArray)), this, SLOT(onDataArrived(QByteArray)));
+
+    handshakeTimer = new QTimer(this);
+    connect(handshakeTimer, SIGNAL(timeout()), this, SLOT(onHandshakeTimeout()));
 
     sequenceBlockTimer = new QTimer(this);
     sequenceBlockTimer->setSingleShot(true);
@@ -84,15 +86,13 @@ BigeyeLite *BigeyeLite::instance()
 
 void BigeyeLite::onDeviceAttached()
 {
-    for (auto p: initSequence) {
-        repeaterFileWrite(p.first, p.second.toLatin1());
-    }
-
-    setLinkStatus(Connected);
+    handshakeTimer->start(1000);
 }
 
 void BigeyeLite::onDeviceDetached()
 {
+    setPowerState(PowerUnknown);
+    handshakeTimer->stop();
     sequenceBlockTimer->stop();
     setLinkStatus(Disconnected);
 }
@@ -101,8 +101,10 @@ void BigeyeLite::onTransmitSequence()
 {
     if (!sequenceBlock.isEmpty()) {
         auto p = sequenceBlock.dequeue();
-        linker->tramsmitBytes(escape(p.first));
+        linker->tramsmitBytes(p.first);
         sequenceBlockTimer->start(p.second);
+    } else {
+        sequenceBlockTimerRunning = false;
     }
 }
 
@@ -111,10 +113,67 @@ void BigeyeLite::onDataArrived(const QByteArray &bytes)
     dispose(bytes);
 }
 
+void BigeyeLite::onHandshakeTimeout()
+{
+    QByteArray block;
+    QDataStream istream(&block, QIODevice::WriteOnly);
+    istream.setVersion(QDataStream::Qt_4_8);
+    istream << QString("Bigeye");
+    istream << QString("handshake");
+    istream << QString("repeater") << ++handshakeSequence;
+    enqueueBlock(block);
+
+    qDebug() << "handshake repeater" << handshakeSequence;
+}
+
+void BigeyeLite::respHandshake(QDataStream &stream)
+{
+    QString client;
+    int sequence;
+    stream >> client >> sequence;
+    if (stream.status() == QDataStream::Ok
+            && client == "repeater"
+            && sequence == handshakeSequence) {
+        handshakeTimer->stop();
+        for (auto p: initSequence) {
+            repeaterFileWrite(p.first, p.second.toLatin1());
+        }
+        setLinkStatus(Connected);
+        powerStatePollInit();
+    }
+}
+
+void BigeyeLite::respPowerStateChanged(QDataStream &stream)
+{
+    int tmp;
+    PowerState state;
+    stream >> tmp;
+    state = static_cast<PowerState>(tmp);
+    setPowerState(state);
+}
+
+void BigeyeLite::respRepeaterFileRead(QDataStream &stream)
+{
+    QString filename;
+    QByteArray content;
+    bool exist;
+
+    stream >> filename >> content >> exist;
+    if (stream.status() == QDataStream::Ok && exist) {
+        if (filename == "/sys/class/gpio/gpio52/value") {
+            if (content[0] == '1') {
+                setPowerState(PowerOn);
+            } else {
+                setPowerState(PowerOff);
+            }
+        }
+    }
+}
+
 void BigeyeLite::powerButtonPress()
 {
     repeaterFileWrite("/sys/class/gpio/gpio48/value", "0", 1500);
-    repeaterFileWrite("/sys/class/gpio/gpio48/value", "1");
+    repeaterFileWrite("/sys/class/gpio/gpio48/value", "1", 500);
 }
 
 void BigeyeLite::knobLeftRotate()
@@ -137,9 +196,20 @@ void BigeyeLite::enterButtonPress()
     repeaterFileWrite("/sys/class/gpio/gpio51/value", "1");
 }
 
-void BigeyeLite::runningStateQuery()
+void BigeyeLite::enqueueBlock(const QByteArray &block, int delay)
 {
+    if (delay == 0) {
+        linker->tramsmitBytes(escape(block));
+        return;
+    }
 
+    if (sequenceBlockTimerRunning) {
+        sequenceBlock.enqueue(qMakePair(escape(block), delay));
+    } else {
+        linker->tramsmitBytes(escape(block));
+        sequenceBlockTimerRunning = true;
+        sequenceBlockTimer->start(delay);
+    }
 }
 
 void BigeyeLite::repeaterFileWrite(const QString &filename, const QByteArray &content, int delay)
@@ -153,22 +223,30 @@ void BigeyeLite::repeaterFileWrite(const QString &filename, const QByteArray &co
             << content
             << false;
 
-    sequenceBlock.enqueue(qMakePair(block, delay));
-
-    if (!sequenceBlockTimer->isActive())
-        sequenceBlockTimer->start(10);
+    enqueueBlock(block, delay);
 }
 
-void BigeyeLite::start()
+void BigeyeLite::repeaterFileRead(const QString &filename, int delay)
 {
-    qDebug() << "start";
-    powerButtonPress();
-    knobLeftRotate();
-    knobRightRotate();
-    enterButtonPress();
+    QByteArray block;
+    QDataStream istream(&block, QIODevice::WriteOnly);
+    istream.setVersion(QDataStream::Qt_4_8);
+    istream << QString("Bigeye");
+    istream << QString("repeaterFileRead");
+    istream << filename;
+
+    enqueueBlock(block, delay);
 }
 
-void BigeyeLite::stop()
+void BigeyeLite::powerStatePollInit()
 {
-    qDebug() << "stop";
+    QByteArray block;
+    QDataStream istream(&block, QIODevice::WriteOnly);
+    istream.setVersion(QDataStream::Qt_4_8);
+    istream << QString("Bigeye");
+    istream << QString("powerStatePollInit");
+    istream << QString("/sys/class/gpio/gpio52/value");
+    istream << reinterpret_cast<int>(100);
+
+    enqueueBlock(block);
 }

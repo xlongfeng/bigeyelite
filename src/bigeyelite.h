@@ -28,27 +28,37 @@
 
 class QTimer;
 class BigeyeLinker;
+class AbstractTest;
 
 class BigeyeLite : public Bigeye
 {
     Q_OBJECT
 
     Q_PROPERTY(LinkStatus linkStatus READ linkStatus MEMBER m_linkStatus WRITE setLinkStatus NOTIFY linkStatusChanged)
+    Q_PROPERTY(PowerState powerState READ powerState MEMBER m_powerState WRITE setPowerState NOTIFY powerStateChanged)
 
 public:
     enum LinkStatus {
         Disconnected,
         Connected,
     };
-
     Q_ENUM(LinkStatus)
+
+    enum PowerState {
+        PowerUnknown,
+        PowerOff,
+        PowerOn,
+    };
+    Q_ENUM(PowerState)
 
     ~BigeyeLite();
 
     static BigeyeLite *instance();
 
-    Q_INVOKABLE void start();
-    Q_INVOKABLE void stop();
+    void powerButtonPress();
+    void knobLeftRotate();
+    void knobRightRotate();
+    void enterButtonPress();
 
     LinkStatus linkStatus()
     {
@@ -61,22 +71,44 @@ public:
         emit linkStatusChanged();
     }
 
+    PowerState powerState()
+    {
+        return m_powerState;
+    }
+
+    void setPowerState(PowerState status)
+    {
+        if (m_powerState != status) {
+            m_powerState = status;
+            emit powerStateChanged();
+        }
+    }
+
 signals:
     void linkStatusChanged();
+    void powerStateChanged();
+    void startTest();
+    void stopTest();
 
 private slots:
     void onDeviceAttached();
     void onDeviceDetached();
+
     void onTransmitSequence();
     void onDataArrived(const QByteArray &bytes);
 
+    void onHandshakeTimeout();
+    void respHandshake(QDataStream &stream);
+
+    void respPowerStateChanged(QDataStream &stream);
+
+    void respRepeaterFileRead(QDataStream &stream);
+
 private:
-    void powerButtonPress();
-    void knobLeftRotate();
-    void knobRightRotate();
-    void enterButtonPress();
-    void runningStateQuery();
+    void enqueueBlock(const QByteArray &block, int delay = 50);
     void repeaterFileWrite(const QString &filename, const QByteArray &content, int delay = 50);
+    void repeaterFileRead(const QString &filename, int delay = 50);
+    void powerStatePollInit();
 
 private:
     explicit BigeyeLite(QObject *parent = nullptr);
@@ -85,11 +117,17 @@ private:
 private:
     static BigeyeLite *self;
     BigeyeLinker *linker;
-    LinkStatus m_linkStatus;
+    LinkStatus m_linkStatus = Disconnected;
+    PowerState m_powerState = PowerUnknown;
+
+    QTimer *handshakeTimer;
+    int handshakeSequence = 0;
 
     static QList<QPair<QString, QString>> initSequence;
+
     QTimer *sequenceBlockTimer;
     QQueue<QPair<QByteArray, int>> sequenceBlock;
+    bool sequenceBlockTimerRunning = false;
 };
 
 #endif // BIGEYELITE_H
