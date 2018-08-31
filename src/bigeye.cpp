@@ -22,17 +22,90 @@
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 
-#include <QDataStream>
 #include <QFile>
+#include <QDataStream>
+#include <QTextStream>
+#include <QDateTime>
 #include <QDebug>
 
 #include "bigeye.h"
 
 Bigeye::Bigeye(QObject *parent) :
-    QObject(parent),
-    extendedDataSize(-1)
+    QObject(parent)
 {
+    logger = new QFile("bigeyelogger.txt", this);
+    logger->open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Append);
     getDeviceInfo();
+}
+
+void Bigeye::debug(const char *msg, ...)
+{
+    va_list ap;
+    va_start(ap, msg);
+    QString buf = QString::vasprintf(msg, ap);
+    va_end(ap);
+    QTextStream out(logger);
+    const QString &datetime = currentDateTime();
+    out << datetime << " [DEBUG] " << buf;
+    endl(out);
+    emit log(LoggerDebug, datetime, buf);
+}
+
+void Bigeye::info(const char *msg, ...)
+{
+    va_list ap;
+    va_start(ap, msg);
+    QString buf = QString::vasprintf(msg, ap);
+    va_end(ap);
+    QTextStream out(logger);
+    const QString &datetime = currentDateTime();
+    out << datetime << " [INFO] " << buf;
+    endl(out);
+    emit log(LoggerInfo, datetime, buf);
+}
+
+void Bigeye::warning(const char *msg, ...)
+{
+    va_list ap;
+    va_start(ap, msg);
+    QString buf = QString::vasprintf(msg, ap);
+    va_end(ap);
+    QTextStream out(logger);
+    const QString &datetime = currentDateTime();
+    out << datetime << " [WARNING] " << buf;
+    endl(out);
+    emit log(LoggerWarning, datetime, buf);
+}
+
+void Bigeye::critical(const char *msg, ...)
+{
+    va_list ap;
+    va_start(ap, msg);
+    QString buf = QString::vasprintf(msg, ap);
+    va_end(ap);
+    QTextStream out(logger);
+    const QString &datetime = currentDateTime();
+    out << datetime << " [CRITICAL] " << buf;
+    endl(out);
+    emit log(LoggerCritical, datetime, buf);
+}
+
+void Bigeye::fatal(const char *msg, ...)
+{
+    va_list ap;
+    va_start(ap, msg);
+    QString buf = QString::vasprintf(msg, ap);
+    va_end(ap);
+    QTextStream out(logger);
+    const QString &datetime = currentDateTime();
+    out << datetime << " [FATAL] " << buf;
+    endl(out);
+    emit log(LoggerFatal, datetime, buf);
+}
+
+QString Bigeye::currentDateTime() const
+{
+    return QDateTime::currentDateTime().toString("yyyy-MM-dd HH:MM:ss");
 }
 
 void Bigeye::dispose(const QByteArray &bytes)

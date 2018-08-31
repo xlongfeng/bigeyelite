@@ -22,12 +22,32 @@
 
 #include <QObject>
 
+class QFile;
+
 class Bigeye : public QObject
 {
     Q_OBJECT
 
 public:
+    enum LoggerLevel {
+        LoggerDebug,
+        LoggerInfo,
+        LoggerWarning,
+        LoggerCritical,
+        LoggerFatal,
+    };
+    Q_ENUM(LoggerLevel)
+
     explicit Bigeye(QObject *parent = nullptr);
+
+    void debug(const char *msg, ...);
+    void info(const char *msg, ...);
+    void warning(const char *msg, ...);
+    void critical(const char *msg, ...);
+    void fatal(const char *msg, ...);
+
+signals:
+    void log(Bigeye::LoggerLevel level, const QString &datetime, const QString &msg);
 
 protected:
     QString getDeviceType() const
@@ -67,11 +87,14 @@ protected:
     QByteArray unescape(const QByteArray &data);
 
 private:
+    QString currentDateTime() const;
     void getDeviceInfo();
 
 private:
+    QFile *logger;
+
     QByteArray datagram;
-    int extendedDataSize;
+    int extendedDataSize = -1;
 
     QString deviceType;
 
