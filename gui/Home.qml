@@ -24,7 +24,24 @@ import QtQuick.Controls 2.3
 import Backend 1.0
 
 Page {
+    id: procedure
+
     title: qsTr("Home")
+
+    states: [
+        State {
+            name: "start"
+        },
+        State {
+            name: "stop"
+        }
+    ]
+
+    state: testCase.running ? "start" : "stop"
+
+    AutoOnOffTest {
+        id: testCase
+    }
 
     Flickable {
         id: controlPanel
@@ -44,11 +61,11 @@ Page {
             anchors.left: parent.left
 
             GroupBox {
-                id: shutdown
+                enabled: procedure.state == "stop"
 
                 label: Text {
                     font.pointSize: 12
-                    text: qsTr("Shutdown Duration")
+                    text: qsTr("Power Off Duration")
                     leftPadding: 8
                 }
 
@@ -56,45 +73,49 @@ Page {
                     spacing: 4
 
                     LabelSpinBox {
+                        id: powerOffDay
                         text: qsTr("Day")
                         from: 0
-                        to: 30
+                        to: 15
                         stepSize: 1
                         value: 0
                     }
 
                     LabelSpinBox {
+                        id: powerOffHour
                         text: qsTr("Hour")
                         from: 0
-                        to: 24
+                        to: 23
                         stepSize: 1
                         value: 0
                     }
 
                     LabelSpinBox {
+                        id: powerOffMinute
                         text: qsTr("Minute")
                         from: 0
-                        to: 60
+                        to: 59
                         stepSize: 1
-                        value: 5
+                        value: 0
                     }
 
                     LabelSpinBox {
+                        id: powerOffSecond
                         text: qsTr("Second")
                         from: 0
-                        to: 60
+                        to: 59
                         stepSize: 1
-                        value: 0
+                        value: 20
                     }
                 }
             }
 
             GroupBox {
-                id: running
+                enabled: procedure.state == "stop"
 
                 label: Text {
                     font.pointSize: 12
-                    text: qsTr("Running Duration")
+                    text: qsTr("Power On Duration")
                     leftPadding: 4
                 }
 
@@ -102,48 +123,74 @@ Page {
                     spacing: 8
 
                     LabelSpinBox {
+                        id: powerOnDay
                         text: qsTr("Day")
                         from: 0
-                        to: 30
+                        to: 15
                         stepSize: 1
                         value: 0
                     }
 
                     LabelSpinBox {
+                        id: powerOnHour
                         text: qsTr("Hour")
                         from: 0
-                        to: 24
+                        to: 23
                         stepSize: 1
                         value: 0
                     }
 
                     LabelSpinBox {
+                        id: powerOnMinute
                         text: qsTr("Minute")
                         from: 0
-                        to: 60
+                        to: 59
                         stepSize: 1
-                        value: 5
+                        value: 0
                     }
 
                     LabelSpinBox {
+                        id: powerOnSecond
                         text: qsTr("Second")
                         from: 0
-                        to: 60
+                        to: 59
                         stepSize: 1
-                        value: 0
+                        value: 30
                     }
                 }
             }
 
             Button {
+                id: startButton
+                enabled: {
+                    BigeyeLite.linkStatus == BigeyeLite.Connected
+                    &&  procedure.state == "stop"
+                }
                 text: qsTr("Start")
                 width: parent.width
-                onPressed: BigeyeLite.start()
+                onPressed: {
+                    testCase.setPowerOffDuration(powerOffDay.value, powerOffHour.value, powerOffMinute.value, powerOffSecond.value)
+                    testCase.setPowerOnDuration(powerOnDay.value, powerOnHour.value, powerOnMinute.value, powerOnSecond.value)
+                    testCase.start()
+                }
+            }
+
+            Button {
+                id: stopButton
+                enabled: {
+                    BigeyeLite.linkStatus == BigeyeLite.Connected
+                    && procedure.state == "start"
+                }
+                text: qsTr("Stop")
+                width: parent.width
+                onPressed: {
+                    testCase.stop()
+                }
             }
         }
     }
 
-    Frame {
+    Item {
         anchors.left: controlPanel.right
         anchors.right: parent.right
         anchors.top: parent.top
@@ -155,27 +202,45 @@ Page {
             spacing: 8
 
             LabelTextField {
-                text: qsTr("Shutdown Countdown")
+                label: qsTr("Power Off Countdown")
+                text: testCase.powerOffCountdown
             }
 
             LabelTextField {
-                text: qsTr("Running Countdown")
+                label: qsTr("Power On Countdown")
+                text: testCase.powerOnCountdown
             }
 
             LabelTextField {
-                text: qsTr("Powerup Counter")
+                label: qsTr("Power On Count")
+                text: testCase.powerOnCount
             }
 
-            Rectangle {
-                color: "gray"
-                Layout.preferredHeight: 1
+            ProgressBar {
+                indeterminate: true
                 Layout.fillWidth: true
             }
 
             ListView {
-                model: LogModel { }
-                delegate: Text {
-                    text: display
+                id: logView
+                model: LogModel { onRowsInserted: logView.positionViewAtEnd() }
+                delegate: RowLayout {
+                    property var textColor: {
+                        if (level == BigeyeLite.LoggerInfo)
+                            return "green"
+                        else if (level == BigeyeLite.LoggerFatal)
+                            return "red"
+                        else
+                            return "black"
+                    }
+                    Text {
+                        color: textColor
+                        text: datetime
+                    }
+                    Text {
+                        color: textColor
+                        text: message
+                    }
                 }
 
                 Layout.fillWidth: true

@@ -22,6 +22,9 @@
 
 #include "bigeyelite.h"
 #include "logmodel.h"
+#include "simpleonofftest.h"
+#include "quickpresstest.h"
+#include "autoonofftest.h"
 
 static QObject *bigeyelite_singletontype_provider(QQmlEngine *engine, QJSEngine *scriptEngine)
 {
@@ -42,6 +45,10 @@ int main(int argc, char *argv[])
 
     qmlRegisterSingletonType<BigeyeLite>("Backend", 1, 0, "BigeyeLite", bigeyelite_singletontype_provider);
     qmlRegisterType<LogModel>("Backend", 1, 0, "LogModel");
+
+    qmlRegisterType<SimpleOnOffTest>("Backend", 1, 0, "SimpleOnOffTest");
+    qmlRegisterType<QuickPressTest>("Backend", 1, 0, "QuickPressTest");
+    qmlRegisterType<AutoOnOffTest>("Backend", 1, 0, "AutoOnOffTest");
 
     QQmlApplicationEngine engine;
     engine.load(QUrl(QStringLiteral("qrc:/qml/main.qml")));

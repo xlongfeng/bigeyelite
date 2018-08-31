@@ -21,7 +21,8 @@ import QtQuick 2.10
 import QtQuick.Controls 2.3
 
 Row {
-    property alias text: label.text
+    property alias label: label.text
+    property alias text: control.text
 
     spacing: 8
 

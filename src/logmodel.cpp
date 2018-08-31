@@ -17,12 +17,60 @@
  *
  */
 
+#include <QDebug>
+
 #include "logmodel.h"
 
 LogModel::LogModel(QObject *parent) :
-    QStringListModel(parent)
+    QAbstractListModel(parent)
 {
-    QStringList list;
-    list << "asdfasdfasd" << "bsdfef" << "sdfsdc";
-    setStringList(list);
+    connect(BigeyeLite::instance(), SIGNAL(log(Bigeye::LoggerLevel,QString,QString)), this, SLOT(append(Bigeye::LoggerLevel,QString,QString)));
+}
+
+int LogModel::rowCount(const QModelIndex &) const
+{
+    return m_logs.count();
+}
+
+QVariant LogModel::data(const QModelIndex &index, int role) const
+{
+    if (index.row() < rowCount())
+        switch (role) {
+        case LevelRole: return m_logs.at(index.row()).level;
+        case DateTimeRole: return m_logs.at(index.row()).datetime;
+        case MessageRole: return m_logs.at(index.row()).message;
+        default: return QVariant();
+    }
+    return QVariant();
+}
+
+QHash<int, QByteArray> LogModel::roleNames() const
+{
+    static const QHash<int, QByteArray> roles {
+        { LevelRole, "level" },
+        { DateTimeRole, "datetime" },
+        { MessageRole, "message" },
+    };
+    return roles;
+}
+
+void LogModel::append(Bigeye::LoggerLevel level, const QString &datetime, const QString &msg)
+{
+    if (level < m_levelLimit)
+        return;
+
+    int row = rowCount();
+    beginInsertRows(QModelIndex(), row, row);
+    m_logs.insert(row, {level, datetime, msg});
+    endInsertRows();
+}
+
+void LogModel::remove(int row)
+{
+    if (row < 0 || row >= m_logs.count())
+        return;
+
+    beginRemoveRows(QModelIndex(), row, row);
+    m_logs.removeAt(row);
+    endRemoveRows();
 }

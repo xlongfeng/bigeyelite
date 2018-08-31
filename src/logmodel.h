@@ -21,18 +21,59 @@
 #ifndef LOGMODEL_H
 #define LOGMODEL_H
 
-#include <QStringListModel>
+#include <QAbstractListModel>
+#include <QList>
 
-class LogModel : public QStringListModel
+#include "bigeyelite.h"
+
+class LogModel : public QAbstractListModel
 {
     Q_OBJECT
 
+    Q_PROPERTY(Bigeye::LoggerLevel levelLimit READ levelLimit WRITE setLevelLimit MEMBER m_levelLimit NOTIFY levelLimitChanged)
+
 public:
+    enum LogRole {
+        LevelRole = Qt::DisplayRole,
+        DateTimeRole = Qt::UserRole,
+        MessageRole,
+    };
+    Q_ENUM(LogRole)
+
     explicit LogModel(QObject *parent = nullptr);
 
+    Bigeye::LoggerLevel levelLimit()
+    {
+        return m_levelLimit;
+    }
+
+    void setLevelLimit(Bigeye::LoggerLevel level)
+    {
+        m_levelLimit = level;
+    }
+
+    int rowCount(const QModelIndex & = QModelIndex()) const override;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    QHash<int, QByteArray> roleNames() const override;
+
+    Q_INVOKABLE void remove(int row);
+
 signals:
+    void levelLimitChanged();
 
 public slots:
+    void append(Bigeye::LoggerLevel level, const QString &datetime, const QString &msg);
+
+private:
+    Bigeye::LoggerLevel m_levelLimit = Bigeye::LoggerInfo;
+
+    struct Log {
+        Bigeye::LoggerLevel level;
+        QString datetime;
+        QString message;
+    };
+
+    QList<Log> m_logs;
 };
 
 #endif // LOGMODEL_H
