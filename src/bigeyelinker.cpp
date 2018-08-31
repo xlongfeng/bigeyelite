@@ -73,10 +73,12 @@ void BigeyeLinker::tramsmitBytes(const QByteArray &bytes, bool defer)
             tramsmitQueue();
         }
     } else {
-        USBTransferBlock *transmitBlock = USBTransferBlock::create(this, bytes);
-        transmitBlock->fillBulk(deviceHandle, 1, transmitTransferCallback);
-        transmitBlock->submit();
-        ++transmitBlockCount;
+        if (deviceHandle) {
+            USBTransferBlock *transmitBlock = USBTransferBlock::create(this, bytes);
+            transmitBlock->fillBulk(deviceHandle, 1, transmitTransferCallback);
+            transmitBlock->submit();
+            ++transmitBlockCount;
+        }
     }
     transmitMutex.unlock();
 }
@@ -126,9 +128,11 @@ void BigeyeLinker::run()
             if (deviceHandle) {
                 deviceDetached();
                 stopReceive();
+                transmitMutex.lock();
                 libusb_close(deviceHandle);
                 qDebug() << "libusb_close";
                 deviceHandle = nullptr;
+                transmitMutex.unlock();
             }
             msleep(1500);
             findDevice();
@@ -141,8 +145,10 @@ void BigeyeLinker::run()
 
     if (deviceHandle) {
         stopReceive();
+        transmitMutex.lock();
         libusb_close(deviceHandle);
         deviceHandle = nullptr;
+        transmitMutex.unlock();
     }
 
     qDebug() << "BigeyeLinker" << "end";
@@ -278,9 +284,11 @@ int BigeyeLinker::hotplugCallback(libusb_context *ctx, libusb_device *dev,
         if (self->deviceHandle) {
             self->deviceDetached();
             self->stopReceive();
+            self->transmitMutex.lock();
             libusb_close(self->deviceHandle);
             qDebug() << "libusb_close";
             self->deviceHandle = nullptr;
+            self->transmitMutex.unlock();
         }
     } else {
         qDebug() << "Unhandled event" << event;
