@@ -54,6 +54,7 @@ protected:
     {
         return deviceType;
     }
+#ifdef __linux__
     int getFramebufferWidth() const
     {
         return framebufferWidth;
@@ -71,6 +72,7 @@ protected:
         return framebufferLength;
     }
     QByteArray& getFramebuffer();
+#endif
 
     void setExtendDataSize(int size)
     {
@@ -88,7 +90,9 @@ protected:
 
 private:
     QString currentDateTime() const;
+#ifdef __linux__
     void getDeviceInfo();
+#endif
 
 private:
     QFile *logger;
@@ -98,12 +102,14 @@ private:
 
     QString deviceType;
 
+#ifdef __linux__
     int framebufferFd;
     int framebufferWidth;
     int framebufferHeight;
     int framebufferBitDepth;
     int framebufferLength;
     QByteArray framebuffer;
+#endif
 };
 
 #endif // BIGEYE_H

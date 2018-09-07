@@ -17,10 +17,12 @@
  *
  */
 
+#ifdef __linux__
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <linux/fb.h>
+#endif
 
 #include <QFile>
 #include <QDataStream>
@@ -35,7 +37,9 @@ Bigeye::Bigeye(QObject *parent) :
 {
     logger = new QFile("bigeyelogger.txt", this);
     logger->open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Append);
+#ifdef __linux__
     getDeviceInfo();
+#endif
 }
 
 void Bigeye::debug(const char *msg, ...)
@@ -190,6 +194,7 @@ QByteArray Bigeye::unescape(const QByteArray &data)
     return buf;
 }
 
+#ifdef __linux__
 QByteArray& Bigeye::getFramebuffer()
 {
     lseek(framebufferFd, 0, SEEK_SET);
@@ -212,6 +217,7 @@ void Bigeye::getDeviceInfo()
         cmdline.close();
     }
 
+
     struct fb_var_screeninfo fb_varinfo;
     memset(&fb_varinfo, 0, sizeof(struct fb_var_screeninfo));
 
@@ -232,3 +238,4 @@ void Bigeye::getDeviceInfo()
     framebuffer.reserve(framebufferLength);
     framebuffer.resize(framebufferLength);
 }
+#endif

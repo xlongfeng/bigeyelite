@@ -246,7 +246,7 @@ void BigeyeLite::powerStatePollInit()
     istream << QString("Bigeye");
     istream << QString("powerStatePollInit");
     istream << QString("/sys/class/gpio/gpio52/value");
-    istream << reinterpret_cast<int>(100);
+    istream << (int)100;
 
     enqueueBlock(block);
 }

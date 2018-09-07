@@ -25,6 +25,7 @@ BigeyeLinker::BigeyeLinker(QObject *parent) : QThread(parent),
     interrupt(false),
     transmitMutex(QMutex::Recursive),
     transmitBlockCount(0),
+    deviceHandle(nullptr),
     deviceStatus(LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
     discarding(true)
 {
