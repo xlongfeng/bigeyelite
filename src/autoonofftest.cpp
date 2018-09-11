@@ -151,7 +151,7 @@ void AutoOnOffTest::enterPowerCheckState()
     connect(controller, SIGNAL(powerStateChanged()), this, SLOT(onPowerStateException()));
     if (validPowerState == PowerStateShouldBeOff) {
         if (controller->powerState() == BigeyeLite::PowerOff) {
-            controller->info("Device is power off");
+            controller->info("Device power off");
             powerOffCountdownTimer->start(powerOffSecond * 1000);
             powerOffSecondDecreasing = powerOffSecond;
             powerOnSecondDecreasing = 0;
@@ -163,7 +163,7 @@ void AutoOnOffTest::enterPowerCheckState()
         }
     } else if (validPowerState == PowerStateShouldBeOn) {
         if (controller->powerState() == BigeyeLite::PowerOn) {
-            controller->info("Device is power on");
+            controller->info("Device power on");
             powerOnCountdownTimer->start(powerOnSecond * 1000);
             powerOnSecondDecreasing = powerOnSecond;
             powerOffSecondDecreasing = 0;
@@ -177,7 +177,7 @@ void AutoOnOffTest::enterPowerCheckState()
     } else { /* validPowerState == PowerStateNotCare */
         switch (controller->powerState()) {
         case BigeyeLite::PowerOff:
-            controller->info("Device is power off");
+            controller->info("Device power off");
             powerOffCountdownTimer->start(powerOffSecond * 1000);
             powerOffSecondDecreasing = powerOffSecond;
             powerOnSecondDecreasing = 0;
@@ -185,7 +185,7 @@ void AutoOnOffTest::enterPowerCheckState()
             emit powerOnCountdownChanged();
             break;
         case BigeyeLite::PowerOn:
-            controller->info("Device is power on");
+            controller->info("Device power on");
             powerOnCountdownTimer->start(powerOnSecond * 1000);
             powerOnSecondDecreasing = powerOnSecond;
             powerOffSecondDecreasing = 0;
