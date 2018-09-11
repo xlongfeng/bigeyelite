@@ -225,21 +225,16 @@ Page {
                 id: logView
                 model: LogModel { onRowsInserted: logView.positionViewAtEnd() }
                 delegate: RowLayout {
-                    property var textColor: {
-                        if (level == BigeyeLite.LoggerInfo)
-                            return "green"
-                        else if (level == BigeyeLite.LoggerFatal)
-                            return "red"
-                        else
-                            return "black"
-                    }
                     Text {
-                        color: textColor
-                        text: datetime
-                    }
-                    Text {
-                        color: textColor
-                        text: message
+                        color: {
+                            if (level == BigeyeLite.LoggerInfo)
+                                return "green"
+                            else if (level == BigeyeLite.LoggerFatal)
+                                return "red"
+                            else
+                                return "black"
+                        }
+                        text: datetime + " -> " + message
                     }
                 }
 
