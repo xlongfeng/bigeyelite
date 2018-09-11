@@ -48,7 +48,8 @@ BigeyeLinker::~BigeyeLinker()
 void BigeyeLinker::stop()
 {
     requestSafeExit();
-    libusb_hotplug_deregister_callback(ctx, hotplug);
+    if (hasHotplug)
+        libusb_hotplug_deregister_callback(ctx, hotplug);
     wait();
 }
 

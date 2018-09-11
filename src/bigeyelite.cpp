@@ -17,10 +17,10 @@
  *
  */
 
-#include <QDebug>
 #include <QCoreApplication>
 #include <QDataStream>
 #include <QTimer>
+#include <QDebug>
 
 #include "bigeyelinker.h"
 #include "bigeyelite.h"
@@ -54,7 +54,6 @@ QList<QPair<QString, QString>> BigeyeLite::initSequence = {
 BigeyeLite::BigeyeLite(QObject *parent) :
     Bigeye(parent)
 {
-    connect(qApp, SIGNAL(aboutToQuit()), this, SLOT(deleteLater()));
     linker = new BigeyeLinker(this);
     connect(linker, SIGNAL(deviceAttached()), this, SLOT(onDeviceAttached()));
     connect(linker, SIGNAL(deviceDetached()), this, SLOT(onDeviceDetached()));
@@ -72,7 +71,7 @@ BigeyeLite::BigeyeLite(QObject *parent) :
 
 BigeyeLite::~BigeyeLite()
 {
-    linker->requestSafeExit();
+    linker->stop();
 }
 
 BigeyeLite *BigeyeLite::instance()
